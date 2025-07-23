@@ -5,8 +5,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
-# Set tracking URI ke parent directory
-mlflow.set_tracking_uri("file:../mlruns")
+# Force set tracking URI dengan absolute path
+current_dir = os.getcwd()
+mlruns_path = os.path.join(os.path.dirname(current_dir), "mlruns")
+mlflow.set_tracking_uri(f"file://{mlruns_path}")
 
 # Muat Data
 df = pd.read_csv('dataset_preprocessing/Telco-Customer-Churn_preprocessing.csv')
