@@ -26,7 +26,7 @@ jobs:
         id: mlflow_run
         run: |
           # Jalankan mlflow di dalam environment Conda yang sudah dibuat
-          conda run -n churn-env mlflow run ./MLProject --env-manager=local > run_output.txt
+          conda run -n churn-env mlflow run ./MLProject > run_output.txt
           
           # Ekstrak Run ID dari output
           RUN_ID=$(cat run_output.txt | grep "run ID" | awk '{print $NF}')
