@@ -1,11 +1,9 @@
-# File: MLProject/modelling.py
 import pandas as pd
 import mlflow
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
-# Mulai Run MLflow
 with mlflow.start_run():
     # Muat Data
     df = pd.read_csv('dataset_preprocessing/Telco-Customer-Churn_preprocessing.csv')
