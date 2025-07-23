@@ -3,12 +3,12 @@ name: CI Model Training & Docker Push
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'MLProject/**'
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    env:
+      MLFLOW_TRACKING_URI: file:./mlruns
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
