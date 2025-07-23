@@ -18,17 +18,17 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install MLflow (versi spesifik)
+      - name: Install MLflow
         run: pip install "mlflow==2.13.0"
 
       - name: Create Conda environment from file
         run: conda env create -f MLProject/conda.yaml
 
-      - name: Run MLflow Project (cara yang benar)
+      - name: Run MLflow Project
         id: mlflow_run
         run: |
           # Jalankan mlflow di dalam environment yang sudah dibuat
-          conda run -n churn-env mlflow run ./MLProject --no-conda > run_output.txt
+          conda run -n churn-env mlflow run ./MLProject > run_output.txt
           
           # Ekstrak Run ID
           RUN_ID=$(cat run_output.txt | grep "run ID" | awk '{print $NF}')
