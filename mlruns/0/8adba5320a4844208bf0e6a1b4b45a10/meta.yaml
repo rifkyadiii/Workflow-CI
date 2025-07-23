@@ -1,0 +1,15 @@
+artifact_uri: file:///home/arch/DBS/ML%20Flow/Workflow-CI/mlruns/0/8adba5320a4844208bf0e6a1b4b45a10/artifacts
+end_time: 1753282877618
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 8adba5320a4844208bf0e6a1b4b45a10
+run_name: secretive-mink-831
+run_uuid: 8adba5320a4844208bf0e6a1b4b45a10
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1753282873301
+status: 3
+tags: []
+user_id: arch
