@@ -1,24 +1,23 @@
+# File: .github/workflows/main.yml
 name: CI Model Training & Docker Push
 
 on:
   push:
     branches: [ main ]
-
+    
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    env:
-      MLFLOW_TRACKING_URI: file:./mlruns
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python for MLflow installation
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install MLflow
+      - name: Install MLflow (versi spesifik)
         run: pip install "mlflow==2.13.0"
 
       - name: Create Conda environment from file
@@ -26,11 +25,11 @@ jobs:
 
       - name: Run MLflow Project
         id: mlflow_run
-        env:
-          MLFLOW_TRACKING_URI: file:./mlruns
-          MLFLOW_DEFAULT_ARTIFACT_ROOT: ./mlruns
         run: |
-          conda run -n churn-env mlflow run ./MLProject > run_output.txt
+          # Jalankan mlflow di dalam environment Conda yang sudah dibuat
+          conda run -n churn-env mlflow run ./MLProject --no-conda > run_output.txt
+          
+          # Ekstrak Run ID dari output
           RUN_ID=$(cat run_output.txt | grep "run ID" | awk '{print $NF}')
           echo "RUN_ID=${RUN_ID}" >> $GITHUB_ENV
           echo "Training completed. Run ID: ${RUN_ID}"
@@ -43,5 +42,8 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
+          # Bangun Docker image dari model yang dihasilkan oleh MLflow Run
           mlflow models build-docker --model-uri "runs:/${{ env.RUN_ID }}/model" --name "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api"
+          
+          # Push image ke Docker Hub
           docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"

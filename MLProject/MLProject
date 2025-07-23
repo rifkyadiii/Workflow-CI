@@ -1,4 +1,4 @@
-name: ChurnModelTraining
+name: ChurnModelTrainingCI
 
 conda_env: conda.yaml
 
