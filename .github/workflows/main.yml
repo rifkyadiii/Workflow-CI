@@ -17,7 +17,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install MLflow and dependencies
-        run: pip install mlflow scikit-learn pandas
+        run: pip install "mlflow==2.13.0" scikit-learn pandas
 
       - name: Create Conda environment from file
         run: conda env create -f MLProject/conda.yaml
