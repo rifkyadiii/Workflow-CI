@@ -26,15 +26,11 @@ jobs:
 
       - name: Run MLflow Project
         id: mlflow_run
+        env:
+          MLFLOW_TRACKING_URI: file:./mlruns
+          MLFLOW_DEFAULT_ARTIFACT_ROOT: ./mlruns
         run: |
-          # Set environment variables untuk MLflow
-          export MLFLOW_TRACKING_URI="file:$(pwd)/mlruns"
-          export MLFLOW_DEFAULT_ARTIFACT_ROOT="$(pwd)/mlruns"
-          
-          # Jalankan mlflow project
-          conda run -n churn-env -e MLFLOW_TRACKING_URI -e MLFLOW_DEFAULT_ARTIFACT_ROOT mlflow run ./MLProject > run_output.txt
-          
-          # Ekstrak Run ID
+          conda run -n churn-env mlflow run ./MLProject > run_output.txt
           RUN_ID=$(cat run_output.txt | grep "run ID" | awk '{print $NF}')
           echo "RUN_ID=${RUN_ID}" >> $GITHUB_ENV
           echo "Training completed. Run ID: ${RUN_ID}"

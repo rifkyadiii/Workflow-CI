@@ -5,9 +5,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
-# Force set tracking URI dengan absolute path
-# Set tracking URI absolut
-mlflow.set_tracking_uri("file:///home/runner/work/Workflow-CI/Workflow-CI/mlruns")
+# Set tracking URI dengan path absolut
+workspace_path = os.environ.get('GITHUB_WORKSPACE', '/home/runner/work/Workflow-CI/Workflow-CI')
+mlflow.set_tracking_uri(f"file://{workspace_path}/mlruns")
 
 # Muat Data
 df = pd.read_csv('dataset_preprocessing/Telco-Customer-Churn_preprocessing.csv')
