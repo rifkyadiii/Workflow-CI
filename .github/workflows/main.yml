@@ -11,29 +11,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          auto-activate-base: false
-          python-version: 3.10
+          python-version: '3.10'
+
+      - name: Install MLflow and dependencies
+        run: pip install "mlflow==2.13.0" scikit-learn pandas
+
+      - name: Create Conda environment from file
+        run: conda env create -f MLProject/conda.yaml
 
       - name: Run MLflow Project to train model
-        run: mlflow run ./MLProject
-
-      - name: Get MLflow latest run ID
-        id: get_run_id
+        id: mlflow_run
         run: |
-          RUN_ID=$(mlflow runs list --order-by start_time desc | awk 'NR==2{print $1}')
-          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
-          echo "Training completed. Run ID: $RUN_ID"
-
+          # Jalankan mlflow run di dalam environment 'churn-env'
+          # Gunakan --no-conda untuk mencegah MLflow membuat environment baru
+          conda run -n churn-env mlflow run ./MLProject --no-conda > run_output.txt
+          
+          # Ekstrak Run ID dari output dan simpan sebagai environment variable
+          RUN_ID=$(cat run_output.txt | grep "run ID" | awk '{print $NF}')
+          echo "RUN_ID=${RUN_ID}" >> $GITHUB_ENV
+          echo "Training completed. Run ID: ${RUN_ID}"
+        
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Build and Push Docker Image (Advance)
         run: |
+          # Bangun Docker image dari model yang dihasilkan
           mlflow models build-docker --model-uri "runs:/${{ env.RUN_ID }}/model" --name "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api"
+          
+          # Push image ke Docker Hub
           docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"
