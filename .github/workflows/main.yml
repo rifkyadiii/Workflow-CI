@@ -128,8 +128,8 @@ jobs:
           HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
             CMD curl -f http://localhost:8080/health || exit 1
           
-          # Start MLflow model server without mlserver flag to avoid pyenv issue
-          CMD ["mlflow", "models", "serve", "-m", "/app/model", "-h", "0.0.0.0", "-p", "8080"]
+          # Start MLflow model server with --no-conda flag to skip environment validation
+          CMD ["mlflow", "models", "serve", "-m", "/app/model", "-h", "0.0.0.0", "-p", "8080", "--no-conda"]
           EOF
           
           # Copy model artifacts dari MLflow run
