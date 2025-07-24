@@ -140,7 +140,7 @@ jobs:
           fi
           
           # Build Docker image
-          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest" --env-manager local .
+          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest".
           
           # Tag dengan RUN_ID juga untuk versioning
           docker tag "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest" \
@@ -150,6 +150,6 @@ jobs:
           docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"
           docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ env.RUN_ID }}"
           
-          echo "✅ Docker images pushed successfully!"
-          echo "🐳 Latest: ${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"
-          echo "🏷️  Tagged: ${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ env.RUN_ID }}"
+          echo "Docker images pushed successfully!"
+          echo "Latest: ${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"
+          echo "Tagged: ${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ env.RUN_ID }}"
