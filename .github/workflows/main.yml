@@ -85,13 +85,71 @@ jobs:
           
           echo "Building Docker image for run: ${{ env.RUN_ID }}"
           
-          # Bangun Docker image dari model yang dihasilkan oleh MLflow Run
+          # Aktifkan conda environment
           source /usr/share/miniconda/etc/profile.d/conda.sh
           conda activate churn-env
           
-          mlflow models build-docker \
-            --model-uri "runs:/${{ env.RUN_ID }}/model" \
-            --name "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api"
+          # Buat custom Dockerfile untuk Python 3.10
+          cat > Dockerfile << 'EOF'
+          FROM python:3.10-slim
           
-          # Push image ke Docker Hub
+          WORKDIR /app
+          
+          # Install system dependencies
+          RUN apt-get update && apt-get install -y \
+              build-essential \
+              && rm -rf /var/lib/apt/lists/*
+          
+          # Install Python dependencies
+          RUN pip install --no-cache-dir \
+              mlflow==2.13.0 \
+              scikit-learn==1.3.0 \
+              pandas==2.0.3 \
+              numpy==1.24.3 \
+              joblib==1.3.2 \
+              gunicorn
+          
+          # Copy model artifacts
+          COPY model /app/model
+          
+          # Set environment variables
+          ENV MLFLOW_MODEL_PATH=/app/model
+          ENV PYTHONPATH=/app
+          
+          # Expose port
+          EXPOSE 8080
+          
+          # Health check
+          HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+            CMD curl -f http://localhost:8080/health || exit 1
+          
+          # Start MLflow model server
+          CMD ["mlflow", "models", "serve", "-m", "/app/model", "-h", "0.0.0.0", "-p", "8080", "--enable-mlserver"]
+          EOF
+          
+          # Copy model artifacts dari MLflow run
+          mkdir -p model
+          cp -r mlruns/0/${{ env.RUN_ID }}/artifacts/model/* model/
+          
+          # Verifikasi model files ada
+          if [ ! -f "model/MLmodel" ]; then
+            echo "Error: MLmodel file not found"
+            echo "Contents of model directory:"
+            ls -la model/
+            exit 1
+          fi
+          
+          # Build Docker image
+          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest" .
+          
+          # Tag dengan RUN_ID juga untuk versioning
+          docker tag "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest" \
+                     "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ env.RUN_ID }}"
+          
+          # Push images ke Docker Hub
           docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"
+          docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ env.RUN_ID }}"
+          
+          echo "✅ Docker images pushed successfully!"
+          echo "🐳 Latest: ${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"
+          echo "🏷️  Tagged: ${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ env.RUN_ID }}"
