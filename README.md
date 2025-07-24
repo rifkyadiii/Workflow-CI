@@ -40,7 +40,7 @@ GitHub Push → MLflow Training → Model Logging → Docker Build → Docker Hu
 ### Deployment
 1. Push ke `main` branch
 2. GitHub Actions otomatis menjalankan pipeline
-3. Docker image tersedia di Docker Hub: `your-username/churn-prediction-api`
+3. Docker image tersedia di Docker Hub: `rifkyadi11/churn-prediction-api`
 
 ### Running the Model
 ```bash
@@ -128,7 +128,7 @@ mlflow models serve -m runs:/<RUN_ID>/model -p 8080
 
 ## 🔗 Links
 
-- **Docker Hub**: `https://hub.docker.com/r/your-username/churn-prediction-api`
+- **Docker Hub**: `https://hub.docker.com/r/rifkyadi11/churn-prediction-api`
 - **MLflow UI**: Available saat local development
 - **GitHub Actions**: Tab "Actions" di repository
 
@@ -137,5 +137,3 @@ mlflow models serve -m runs:/<RUN_ID>/model -p 8080
 MIT License - Feel free to use dan modify!
 
 ---
-
-> **Note**: Replace `your-username` dengan actual Docker Hub username Anda di secrets dan documentation.
