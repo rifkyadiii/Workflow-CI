@@ -1,5 +1,4 @@
 name: CI Model Training & Docker Push
-
 on:
   push:
     branches: [ main ]
@@ -10,26 +9,40 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+        
       - name: Set up Python for MLflow installation
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
+          
       - name: Install MLflow (versi spesifik)
         run: pip install "mlflow==2.13.0"
-
+        
       - name: Create Conda environment from file
         run: conda env create -f MLProject/conda.yaml
-
+        
       - name: Run MLflow Project
         id: mlflow_run
         run: |
           # Jalankan mlflow di dalam environment Conda yang sudah dibuat
-          conda run -n churn-env mlflow run ./MLProject > run_output.txt
+          conda run -n churn-env mlflow run ./MLProject --no-conda 2>&1 | tee run_output.txt
           
-          # Ekstrak Run ID dari output
-          RUN_ID=$(cat run_output.txt | grep "run ID" | awk '{print $NF}')
+          # Ekstrak Run ID dari output MLflow dengan cara yang lebih reliable
+          RUN_ID=$(grep -E "Started run with ID|Run with id" run_output.txt | tail -1 | sed -E 's/.*ID[[:space:]]+([a-f0-9]+).*/\1/' | tr -d ' ')
+          
+          # Fallback: cari pattern lain jika yang pertama gagal
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(grep -oE '[a-f0-9]{32}' run_output.txt | tail -1)
+          fi
+          
+          # Validasi RUN_ID
+          if [ -z "$RUN_ID" ] || [ ${#RUN_ID} -ne 32 ]; then
+            echo "Error: Could not extract valid Run ID"
+            echo "MLflow output:"
+            cat run_output.txt
+            exit 1
+          fi
+          
           echo "RUN_ID=${RUN_ID}" >> $GITHUB_ENV
           echo "Training completed. Run ID: ${RUN_ID}"
         
@@ -38,11 +51,21 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+          
       - name: Build and Push Docker Image
         run: |
+          # Validasi bahwa RUN_ID ada dan valid
+          if [ -z "${{ env.RUN_ID }}" ]; then
+            echo "Error: RUN_ID is empty"
+            exit 1
+          fi
+          
+          echo "Building Docker image for run: ${{ env.RUN_ID }}"
+          
           # Bangun Docker image dari model yang dihasilkan oleh MLflow Run
-          mlflow models build-docker --model-uri "runs:/${{ env.RUN_ID }}/model" --name "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api"
+          conda run -n churn-env mlflow models build-docker \
+            --model-uri "runs:/${{ env.RUN_ID }}/model" \
+            --name "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api"
           
           # Push image ke Docker Hub
           docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"
