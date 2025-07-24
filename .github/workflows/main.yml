@@ -24,15 +24,34 @@ jobs:
       - name: Run MLflow Project
         id: mlflow_run
         run: |
-          # Jalankan mlflow di dalam environment Conda yang sudah dibuat
-          conda run -n churn-env mlflow run ./MLProject --no-conda 2>&1 | tee run_output.txt
+          # Aktifkan conda environment dan jalankan MLflow project
+          source /usr/share/miniconda/etc/profile.d/conda.sh
+          conda activate churn-env
           
-          # Ekstrak Run ID dari output MLflow dengan cara yang lebih reliable
-          RUN_ID=$(grep -E "Started run with ID|Run with id" run_output.txt | tail -1 | sed -E 's/.*ID[[:space:]]+([a-f0-9]+).*/\1/' | tr -d ' ')
+          # Jalankan MLflow project dalam environment yang sudah aktif
+          mlflow run ./MLProject 2>&1 | tee run_output.txt
           
-          # Fallback: cari pattern lain jika yang pertama gagal
+          # Ekstrak Run ID dari output MLflow dengan berbagai pattern
+          RUN_ID=""
+          
+          # Pattern 1: "Started run with ID"
+          RUN_ID=$(grep -E "Started run with ID" run_output.txt | tail -1 | grep -oE '[a-f0-9]{32}' | head -1)
+          
+          # Pattern 2: "Run with id" 
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(grep -E "Run with id" run_output.txt | tail -1 | grep -oE '[a-f0-9]{32}' | head -1)
+          fi
+          
+          # Pattern 3: Cari semua 32-character hex strings
           if [ -z "$RUN_ID" ]; then
             RUN_ID=$(grep -oE '[a-f0-9]{32}' run_output.txt | tail -1)
+          fi
+          
+          # Pattern 4: Cek di MLflow logs directory
+          if [ -z "$RUN_ID" ]; then
+            if [ -d "mlruns" ]; then
+              RUN_ID=$(find mlruns -name "meta.yaml" -exec dirname {} \; | grep -oE '[a-f0-9]{32}' | tail -1)
+            fi
           fi
           
           # Validasi RUN_ID
@@ -40,6 +59,10 @@ jobs:
             echo "Error: Could not extract valid Run ID"
             echo "MLflow output:"
             cat run_output.txt
+            echo "Checking mlruns directory:"
+            if [ -d "mlruns" ]; then
+              find mlruns -type f -name "meta.yaml" | head -5
+            fi
             exit 1
           fi
           
@@ -63,7 +86,10 @@ jobs:
           echo "Building Docker image for run: ${{ env.RUN_ID }}"
           
           # Bangun Docker image dari model yang dihasilkan oleh MLflow Run
-          conda run -n churn-env mlflow models build-docker \
+          source /usr/share/miniconda/etc/profile.d/conda.sh
+          conda activate churn-env
+          
+          mlflow models build-docker \
             --model-uri "runs:/${{ env.RUN_ID }}/model" \
             --name "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api"
           

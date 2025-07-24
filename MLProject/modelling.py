@@ -5,10 +5,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
-print("Starting MLflow run...")
+print("=" * 50)
+print("STARTING MLFLOW CHURN PREDICTION MODEL TRAINING")
+print("=" * 50)
 
 with mlflow.start_run() as run:
-    print(f"MLflow run started with ID: {run.info.run_id}")
+    run_id = run.info.run_id
+    print(f"MLflow run started with ID: {run_id}")
+    print(f"Started run with ID {run_id}")  # Format yang lebih mudah di-parse
     
     # Muat Data
     data_path = 'dataset_preprocessing/Telco-Customer-Churn_preprocessing.csv'
@@ -20,7 +24,7 @@ with mlflow.start_run() as run:
     df = pd.read_csv(data_path)
     print(f"Data loaded successfully. Shape: {df.shape}")
     
-    X = df.drop('Churn', axis=1)
+    X = df.drop('Churn', axis=1)  
     y = df['Churn']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
@@ -68,5 +72,7 @@ with mlflow.start_run() as run:
         registered_model_name="churn-prediction-model"
     )
     
-    print(f"Model logged successfully with run ID: {run.info.run_id}")
+    print(f"Model logged successfully with run ID: {run_id}")
     print(f"Run completed successfully!")
+    print(f"FINAL RUN ID: {run_id}")
+    print("=" * 50)
