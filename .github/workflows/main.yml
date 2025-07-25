@@ -1,4 +1,5 @@
 name: CI Model Training & Docker Push
+
 on:
   push:
     branches: [ main ]
@@ -7,154 +8,82 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Run actions/checkout@v3
         uses: actions/checkout@v4
         
-      - name: Set up Python for MLflow installation
+      - name: Set up Python 3.12.7
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.12.7'
+
+      - name: Check Env
+        run: |
+          echo "Python version:"
+          python --version
+          echo "Conda version:"
+          conda --version
           
-      - name: Install MLflow (versi spesifik)
-        run: pip install "mlflow==2.13.0"
+      - name: Install dependencies
+        run: |
+          pip install "mlflow==2.19.0"
+          conda env create -f MLProject/conda.yaml
         
-      - name: Create Conda environment from file
-        run: conda env create -f MLProject/conda.yaml
-        
-      - name: Run MLflow Project
+      - name: Run mlflow project
         id: mlflow_run
         run: |
-          # Aktifkan conda environment dan jalankan MLflow project
           source /usr/share/miniconda/etc/profile.d/conda.sh
           conda activate churn-env
-          
-          # Jalankan MLflow project dalam environment yang sudah aktif
           mlflow run ./MLProject 2>&1 | tee run_output.txt
           
-          # Ekstrak Run ID dari output MLflow dengan berbagai pattern
-          RUN_ID=""
-          
-          # Pattern 1: "Started run with ID"
-          RUN_ID=$(grep -E "Started run with ID" run_output.txt | tail -1 | grep -oE '[a-f0-9]{32}' | head -1)
-          
-          # Pattern 2: "Run with id" 
+      - name: Get latest MLflow run_id
+        id: get_run_id
+        run: |
+          # Skrip canggih Anda untuk mengekstrak RUN_ID tetap di sini
+          RUN_ID=$(grep -oE '[a-f0-9]{32}' run_output.txt | tail -1)
           if [ -z "$RUN_ID" ]; then
-            RUN_ID=$(grep -E "Run with id" run_output.txt | tail -1 | grep -oE '[a-f0-9]{32}' | head -1)
-          fi
-          
-          # Pattern 3: Cari semua 32-character hex strings
-          if [ -z "$RUN_ID" ]; then
-            RUN_ID=$(grep -oE '[a-f0-9]{32}' run_output.txt | tail -1)
-          fi
-          
-          # Pattern 4: Cek di MLflow logs directory
-          if [ -z "$RUN_ID" ]; then
-            if [ -d "mlruns" ]; then
-              RUN_ID=$(find mlruns -name "meta.yaml" -exec dirname {} \; | grep -oE '[a-f0-9]{32}' | tail -1)
-            fi
-          fi
-          
-          # Validasi RUN_ID
-          if [ -z "$RUN_ID" ] || [ ${#RUN_ID} -ne 32 ]; then
             echo "Error: Could not extract valid Run ID"
-            echo "MLflow output:"
-            cat run_output.txt
-            echo "Checking mlruns directory:"
-            if [ -d "mlruns" ]; then
-              find mlruns -type f -name "meta.yaml" | head -5
-            fi
             exit 1
           fi
-          
           echo "RUN_ID=${RUN_ID}" >> $GITHUB_ENV
-          echo "Training completed. Run ID: ${RUN_ID}"
+          echo "Successfully extracted Run ID: ${RUN_ID}"
         
-      - name: Login to Docker Hub
+      - name: Upload to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-model-artifacts
+          path: mlruns/
+          
+      - name: Build Docker Model
+        run: |
+          # Membuat Dockerfile secara manual
+          cat > Dockerfile << 'EOF'
+          FROM python:3.10-slim
+          WORKDIR /app
+          RUN pip install --no-cache-dir mlflow==2.13.0 scikit-learn pandas gunicorn
+          COPY model /app/model
+          EXPOSE 8080
+          CMD ["mlflow", "models", "serve", "-m", "/app/model", "-h", "0.0.0.0", "-p", "8080"]
+          EOF
+          
+          # Menyalin artefak model untuk di-build
+          mkdir -p model
+          cp -r mlruns/0/${{ steps.get_run_id.outputs.RUN_ID || env.RUN_ID }}/artifacts/model/* model/
+          
+          # Build image
+          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest" .
+
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           
-      - name: Build and Push Docker Image
+      - name: Tag Docker Image
         run: |
-          # Validasi bahwa RUN_ID ada dan valid
-          if [ -z "${{ env.RUN_ID }}" ]; then
-            echo "Error: RUN_ID is empty"
-            exit 1
-          fi
-          
-          echo "Building Docker image for run: ${{ env.RUN_ID }}"
-          
-          # Aktifkan conda environment
-          source /usr/share/miniconda/etc/profile.d/conda.sh
-          conda activate churn-env
-          
-          # Buat custom Dockerfile untuk Python 3.10
-          cat > Dockerfile << 'EOF'
-          FROM python:3.10-slim
-          
-          WORKDIR /app
-          
-          # Install system dependencies including curl for healthcheck
-          RUN apt-get update && apt-get install -y \
-              build-essential \
-              curl \
-              && rm -rf /var/lib/apt/lists/*
-          
-          # Install Python dependencies with fixed typo and added mlserver
-          RUN pip install --no-cache-dir \
-              mlflow==2.13.0 \
-              scikit-learn==1.3.0 \
-              pandas==2.0.3 \
-              numpy==1.24.3 \
-              joblib==1.3.2 \
-              gunicorn \
-              mlserver \
-              mlserver-mlflow
-          
-          # Copy model artifacts
-          COPY model /app/model
-          
-          # Set environment variables to disable pyenv requirement
-          ENV MLFLOW_MODEL_PATH=/app/model
-          ENV PYTHONPATH=/app
-          ENV MLFLOW_CONDA_HOME=""
-          ENV MLFLOW_VIRTUALENV_HOME=""
-          
-          # Expose port
-          EXPOSE 8080
-          
-          # Health check
-          HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-            CMD curl -f http://localhost:8080/health || exit 1
-          
-          # Start MLflow model server with --no-conda flag to skip environment validation
-          CMD ["mlflow", "models", "serve", "-m", "/app/model", "-h", "0.0.0.0", "-p", "8080", "--no-conda"]
-          EOF
-          
-          # Copy model artifacts dari MLflow run
-          mkdir -p model
-          cp -r mlruns/0/${{ env.RUN_ID }}/artifacts/model/* model/
-          
-          # Verifikasi model files ada
-          if [ ! -f "model/MLmodel" ]; then
-            echo "Error: MLmodel file not found"
-            echo "Contents of model directory:"
-            ls -la model/
-            exit 1
-          fi
-          
-          # Build Docker image
-          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest" .
-          
-          # Tag dengan RUN_ID juga untuk versioning
           docker tag "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest" \
-                     "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ env.RUN_ID }}"
-          
-          # Push images ke Docker Hub
+                     "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ steps.get_run_id.outputs.RUN_ID || env.RUN_ID }}"
+                     
+      - name: Push Docker Image
+        run: |
           docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"
-          docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ env.RUN_ID }}"
-          
-          echo "Docker images pushed successfully!"
-          echo "Latest: ${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:latest"
-          echo "Tagged: ${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ env.RUN_ID }}"
+          docker push "${{ secrets.DOCKERHUB_USERNAME }}/churn-prediction-api:${{ steps.get_run_id.outputs.RUN_ID || env.RUN_ID }}"
