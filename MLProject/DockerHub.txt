@@ -1,1 +1,1 @@
-https://hub.docker.com/repository/docker/rifkyadi11/workflow-ci/
+https://hub.docker.com/repository/docker/rifkyadi11/churn-prediction-api
